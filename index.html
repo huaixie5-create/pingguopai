@@ -149,13 +149,46 @@
   .tab svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
   .tab.active { color: var(--accent); font-weight: 600; }
 
-  button:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  /* ---------- 设置页：表单 ---------- */
+  .field { margin-bottom: 22px; }
+  .field label { display: block; margin-bottom: 6px; font-weight: 600; }
+  .field input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--card);
+    color: var(--ink);
+    font: inherit;
+  }
+  .row { display: flex; gap: 10px; }
+  .hint { margin-top: 6px; font-size: 13px; color: var(--soft); line-height: 1.5; }
+
+  .btn {
+    padding: 10px 18px;
+    border: 1px solid var(--accent);
+    border-radius: 12px;
+    background: var(--accent);
+    color: #fff;
+    font: inherit;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .btn.ghost { background: transparent; color: var(--accent); }
+  .actions { display: flex; gap: 10px; }
+  .actions .btn { flex: 1; }
+
+  .result { margin-top: 16px; font-size: 14px; word-break: break-word; }
+  .result.ok  { color: #2F6B4B; }
+  .result.err { color: #A33A2B; }
+
+  button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 </style>
 </head>
 
 <body>
 
-<div id="status" style="flex:none;padding:4px 12px;font-size:12px;background:#F3D9D4;color:#7A2B20;text-align:center">脚本未运行 ✗</div>
+<div id="status" style="display:none;flex:none;padding:4px 12px;font-size:12px;background:#F3D9D4;color:#7A2B20;text-align:center"></div>
 
 <main>
   <!-- ========== 世界 ========== -->
@@ -198,10 +231,42 @@
   <section class="page" id="page-settings">
     <header class="page-head">
       <h1>设置</h1>
-      <p>连接 API</p>
+      <p>连接 API（OpenAI 格式）</p>
     </header>
     <div class="page-body">
-      <div class="empty"><strong>还没有连接 API</strong>第 2 步会在这里填写地址、Key 和模型名。</div>
+      <div class="field">
+        <label for="cfg-url">API 地址</label>
+        <input id="cfg-url" type="url" inputmode="url" placeholder="https://api.openai.com/v1"
+               autocomplete="off" autocapitalize="off" spellcheck="false">
+        <p class="hint">填到 /v1 为止，末尾不用加 /chat/completions。</p>
+      </div>
+
+      <div class="field">
+        <label for="cfg-key">API Key</label>
+        <div class="row">
+          <input id="cfg-key" type="password" placeholder="sk-……"
+                 autocomplete="off" autocapitalize="off" spellcheck="false">
+          <button class="btn ghost" id="toggle-key" type="button">显示</button>
+        </div>
+        <p class="hint">只保存在这台手机的浏览器里，只会发给你填的 API 地址。</p>
+      </div>
+
+      <div class="field">
+        <label for="cfg-model">模型名</label>
+        <div class="row">
+          <input id="cfg-model" list="model-list" placeholder="例如 gpt-4o"
+                 autocomplete="off" autocapitalize="off" spellcheck="false">
+          <button class="btn ghost" id="fetch-models" type="button">获取列表</button>
+        </div>
+        <datalist id="model-list"></datalist>
+        <p class="hint">点「获取列表」后，清空输入框再点一下，就能从列表里选。</p>
+      </div>
+
+      <div class="actions">
+        <button class="btn" id="save" type="button">保存</button>
+        <button class="btn ghost" id="test" type="button">测试连接</button>
+      </div>
+      <p class="result" id="cfg-result"></p>
     </div>
   </section>
 </main>
@@ -227,15 +292,11 @@
 </nav>
 
 <script>
-  // ---------- 自检：脚本一开始运行，顶部提示条就会变绿 ----------
+  // ---------- 出错时，顶部会弹出红色提示条，方便我们排查 ----------
   const statusBar = document.getElementById('status');
-  statusBar.textContent = '脚本已运行 ✓';
-  statusBar.style.background = '#D9EADF';
-  statusBar.style.color = '#24523A';
   window.onerror = function (msg, src, line) {
     statusBar.textContent = '出错了：' + msg + '（第 ' + line + ' 行）';
-    statusBar.style.background = '#F3D9D4';
-    statusBar.style.color = '#7A2B20';
+    statusBar.style.display = 'block';
   };
 
   // ---------- 切换页面 ----------
@@ -275,6 +336,103 @@
   }
 
   document.getElementById('send').addEventListener('click', send);
+
+
+  // ============================================================
+  //  第 2 步：设置页（API 地址 / Key / 模型名）
+  // ============================================================
+  const SETTINGS_KEY = 'wenyou.settings';      // 存在浏览器里的名字
+
+  function loadSettings() {
+    try { return JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}; }
+    catch (e) { return {}; }
+  }
+  function saveSettings(s) {
+    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); return true; }
+    catch (e) { return false; }
+  }
+
+  const cfgUrl    = document.getElementById('cfg-url');
+  const cfgKey    = document.getElementById('cfg-key');
+  const cfgModel  = document.getElementById('cfg-model');
+  const cfgResult = document.getElementById('cfg-result');
+  const modelList = document.getElementById('model-list');
+
+  // 打开页面时，把之前存的内容填回输入框
+  const saved = loadSettings();
+  cfgUrl.value   = saved.baseUrl || '';
+  cfgKey.value   = saved.apiKey  || '';
+  cfgModel.value = saved.model   || '';
+
+  // 读取输入框当前内容（地址末尾多余的 / 会去掉）
+  function readForm() {
+    return {
+      baseUrl: cfgUrl.value.trim().replace(/\/+$/, ''),
+      apiKey:  cfgKey.value.trim(),
+      model:   cfgModel.value.trim()
+    };
+  }
+
+  function showResult(text, ok) {
+    cfgResult.textContent = text;
+    cfgResult.className = 'result ' + (ok ? 'ok' : 'err');
+  }
+
+  // 显示 / 隐藏 Key
+  document.getElementById('toggle-key').addEventListener('click', function () {
+    const hidden = cfgKey.type === 'password';
+    cfgKey.type = hidden ? 'text' : 'password';
+    this.textContent = hidden ? '隐藏' : '显示';
+  });
+
+  // 保存
+  document.getElementById('save').addEventListener('click', function () {
+    const ok = saveSettings(readForm());
+    showResult(ok ? '已保存。' : '保存失败，浏览器不允许存储。', ok);
+  });
+
+  // 获取模型列表
+  document.getElementById('fetch-models').addEventListener('click', async function () {
+    const s = readForm();
+    if (!s.baseUrl || !s.apiKey) { showResult('请先填好 API 地址和 Key。', false); return; }
+    showResult('获取中……', true);
+    try {
+      const res  = await fetch(s.baseUrl + '/models', { headers: { 'Authorization': 'Bearer ' + s.apiKey } });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) { showResult('获取失败（' + res.status + '）：' + errorText(data), false); return; }
+      const ids = ((data && data.data) || []).map(m => m.id).filter(Boolean);
+      modelList.innerHTML = '';
+      ids.forEach(id => { const o = document.createElement('option'); o.value = id; modelList.appendChild(o); });
+      showResult('获取到 ' + ids.length + ' 个模型。', ids.length > 0);
+    } catch (e) {
+      showResult('连不上：' + e.message + '。请检查地址，以及网络/VPN。', false);
+    }
+  });
+
+  // 测试连接：发一句「你好」，看模型有没有回
+  document.getElementById('test').addEventListener('click', async function () {
+    const s = readForm();
+    if (!s.baseUrl || !s.apiKey || !s.model) { showResult('请先把地址、Key、模型名都填上。', false); return; }
+    showResult('测试中……', true);
+    try {
+      const res = await fetch(s.baseUrl + '/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + s.apiKey },
+        body: JSON.stringify({ model: s.model, messages: [{ role: 'user', content: '你好' }] })
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) { showResult('连接失败（' + res.status + '）：' + errorText(data), false); return; }
+      const reply = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+      showResult('连接成功。模型回复：' + (reply || '（空）'), true);
+    } catch (e) {
+      showResult('连不上：' + e.message + '。请检查地址，以及网络/VPN。', false);
+    }
+  });
+
+  // 从 API 返回的错误里取出人能看懂的文字
+  function errorText(data) {
+    return (data && data.error && (data.error.message || data.error)) || '未知错误';
+  }
 </script>
 
 </body>
