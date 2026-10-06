@@ -175,6 +175,30 @@
     cursor: pointer;
   }
   .btn.ghost { background: transparent; color: var(--accent); }
+  .model-picker {
+    margin-top: 8px;
+    max-height: 240px;
+    overflow-y: auto;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--card);
+  }
+  .model-picker[hidden] { display: none; }
+  .model-item {
+    display: block;
+    width: 100%;
+    padding: 12px;
+    border: 0;
+    border-bottom: 1px solid var(--line);
+    background: none;
+    color: var(--ink);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .model-item:last-child { border-bottom: 0; }
+  .model-item.current { color: var(--accent); font-weight: 600; }
+
   .actions { display: flex; gap: 10px; }
   .actions .btn { flex: 1; }
 
@@ -254,12 +278,12 @@
       <div class="field">
         <label for="cfg-model">模型名</label>
         <div class="row">
-          <input id="cfg-model" list="model-list" placeholder="例如 gpt-4o"
+          <input id="cfg-model" placeholder="例如 gpt-4o"
                  autocomplete="off" autocapitalize="off" spellcheck="false">
           <button class="btn ghost" id="fetch-models" type="button">获取列表</button>
         </div>
-        <datalist id="model-list"></datalist>
-        <p class="hint">点「获取列表」后，清空输入框再点一下，就能从列表里选。</p>
+        <div class="model-picker" id="model-picker" hidden></div>
+        <p class="hint">点「获取列表」后，下面会出现模型列表，点一下就能选。也可以直接打字来筛选。</p>
       </div>
 
       <div class="actions">
@@ -356,7 +380,7 @@
   const cfgKey    = document.getElementById('cfg-key');
   const cfgModel  = document.getElementById('cfg-model');
   const cfgResult = document.getElementById('cfg-result');
-  const modelList = document.getElementById('model-list');
+  const modelPicker = document.getElementById('model-picker');
 
   // 打开页面时，把之前存的内容填回输入框
   const saved = loadSettings();
@@ -377,6 +401,34 @@
     cfgResult.textContent = text;
     cfgResult.className = 'result ' + (ok ? 'ok' : 'err');
   }
+
+  // ---------- 模型列表：点一下就能选 ----------
+  const MODELS_KEY = 'wenyou.models';
+  let modelIds = [];
+  try { modelIds = JSON.parse(localStorage.getItem(MODELS_KEY)) || []; } catch (e) {}
+
+  function renderModels() {
+    const typed = cfgModel.value.trim().toLowerCase();
+    const exact = modelIds.some(id => id.toLowerCase() === typed);
+    // 输入框里有字、又不是完整的模型名时，按输入内容筛选
+    const shown = (typed && !exact) ? modelIds.filter(id => id.toLowerCase().includes(typed)) : modelIds;
+    modelPicker.innerHTML = '';
+    shown.forEach(id => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'model-item' + (id.toLowerCase() === typed ? ' current' : '');
+      b.textContent = id;
+      b.addEventListener('click', () => {
+        cfgModel.value = id;
+        cfgModel.blur();
+        modelPicker.hidden = true;
+      });
+      modelPicker.appendChild(b);
+    });
+    modelPicker.hidden = shown.length === 0;
+  }
+  cfgModel.addEventListener('focus', renderModels);
+  cfgModel.addEventListener('input', renderModels);
 
   // 显示 / 隐藏 Key
   document.getElementById('toggle-key').addEventListener('click', function () {
@@ -401,9 +453,10 @@
       const data = await res.json().catch(() => null);
       if (!res.ok) { showResult('获取失败（' + res.status + '）：' + errorText(data), false); return; }
       const ids = ((data && data.data) || []).map(m => m.id).filter(Boolean);
-      modelList.innerHTML = '';
-      ids.forEach(id => { const o = document.createElement('option'); o.value = id; modelList.appendChild(o); });
-      showResult('获取到 ' + ids.length + ' 个模型。', ids.length > 0);
+      modelIds = ids;
+      try { localStorage.setItem(MODELS_KEY, JSON.stringify(ids)); } catch (e) {}
+      renderModels();
+      showResult('获取到 ' + ids.length + ' 个模型，点下面的列表选择。', ids.length > 0);
     } catch (e) {
       showResult('连不上：' + e.message + '。请检查地址，以及网络/VPN。', false);
     }
