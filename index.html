@@ -6,12 +6,10 @@
 <title>文游</title>
 
 <!-- ============================================================
-  第 1 步：骨架
-  这个文件分三块：
+  文件结构：
     1. <style>  管长相（颜色、布局）
-    2. <body>   管内容（四个页面 + 底栏）
-    3. <script> 管行为（点底栏切换页面）
-  后面每一步，我们都只是往这三块里加东西。
+    2. <body>   管内容（五个页面 + 底栏）
+    3. <script> 管行为（切换页面、调用 API、记忆总结）
 ============================================================ -->
 
 <style>
@@ -27,13 +25,12 @@
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
-
   html, body { height: 100%; }
 
   body {
     display: flex;
     flex-direction: column;
-    height: 100dvh;                 /* 手机上刚好一屏高 */
+    height: 100dvh;
     background: var(--paper);
     color: var(--ink);
     font-family: -apple-system, "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
@@ -44,12 +41,8 @@
   /* ---------- 页面区域 ---------- */
   main { flex: 1; min-height: 0; position: relative; }
 
-  .page {
-    display: none;                  /* 默认都藏起来 */
-    flex-direction: column;
-    height: 100%;
-  }
-  .page.active { display: flex; }   /* 只有带 active 的显示 */
+  .page { display: none; flex-direction: column; height: 100%; }
+  .page.active { display: flex; }
 
   .page-head {
     padding: 18px 20px 12px;
@@ -63,19 +56,11 @@
     letter-spacing: 0.12em;
   }
   .page-head p { font-size: 14px; color: var(--soft); }
-
   .head-row { display: flex; justify-content: space-between; align-items: center; }
-  .btn.small { padding: 6px 14px; font-size: 14px; }
 
   .page-body { flex: 1; overflow-y: auto; padding: 20px; }
 
-  /* 空页面时的提示 */
-  .empty {
-    margin-top: 12vh;
-    text-align: center;
-    color: var(--soft);
-    font-size: 15px;
-  }
+  .empty { margin-top: 12vh; text-align: center; color: var(--soft); font-size: 15px; }
   .empty strong {
     display: block;
     margin-bottom: 6px;
@@ -85,6 +70,17 @@
     color: var(--ink);
   }
 
+  .section-title {
+    margin: 28px 0 14px;
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
+    font-family: var(--title-font);
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+  }
+  .page-body > .section-title:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+
   /* ---------- 世界页：消息 + 输入框 ---------- */
   .log { flex: 1; overflow-y: auto; padding: 16px 20px; }
 
@@ -93,7 +89,7 @@
     margin-bottom: 12px;
     padding: 10px 14px;
     border-radius: 14px;
-    white-space: pre-wrap;          /* 保留换行 */
+    white-space: pre-wrap;
     word-break: break-word;
   }
   .msg.user { margin-left: auto; background: var(--accent); color: #fff; border-bottom-right-radius: 4px; }
@@ -116,7 +112,7 @@
     border-radius: 12px;
     background: var(--card);
     color: var(--ink);
-    font: inherit;                  /* 16px，iPhone 不会自动放大页面 */
+    font: inherit;
     resize: none;
   }
   .composer button {
@@ -129,34 +125,10 @@
     cursor: pointer;
   }
 
-  /* ---------- 底栏 ---------- */
-  nav {
-    display: flex;
-    border-top: 1px solid var(--line);
-    background: var(--card);
-    padding-bottom: env(safe-area-inset-bottom);  /* 避开手机底部小横条 */
-  }
-  .tab {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 2px;
-    padding: 10px 0 8px;
-    border: 0;
-    background: none;
-    color: var(--soft);
-    font: inherit;
-    font-size: 13px;
-    cursor: pointer;
-  }
-  .tab svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-  .tab.active { color: var(--accent); font-weight: 600; }
-
-  /* ---------- 设置页：表单 ---------- */
+  /* ---------- 表单（设置页、记忆页共用） ---------- */
   .field { margin-bottom: 22px; }
   .field label { display: block; margin-bottom: 6px; font-weight: 600; }
-  .field input {
+  .field input, .field textarea {
     width: 100%;
     padding: 10px 12px;
     border: 1px solid var(--line);
@@ -165,6 +137,7 @@
     color: var(--ink);
     font: inherit;
   }
+  .field textarea { line-height: 1.55; resize: vertical; }
   .row { display: flex; gap: 10px; }
   .hint { margin-top: 6px; font-size: 13px; color: var(--soft); line-height: 1.5; }
 
@@ -179,7 +152,16 @@
     cursor: pointer;
   }
   .btn.ghost { background: transparent; color: var(--accent); }
+  .btn.small { padding: 6px 14px; font-size: 14px; }
   button:disabled { opacity: 0.5; cursor: default; }
+  .actions { display: flex; gap: 10px; }
+  .actions .btn { flex: 1; }
+
+  .result { margin-top: 12px; font-size: 14px; word-break: break-word; }
+  .result:empty { display: none; }
+  .result.ok  { color: #2F6B4B; }
+  .result.err { color: #A33A2B; }
+
   .model-picker {
     margin-top: 8px;
     max-height: 240px;
@@ -204,12 +186,29 @@
   .model-item:last-child { border-bottom: 0; }
   .model-item.current { color: var(--accent); font-weight: 600; }
 
-  .actions { display: flex; gap: 10px; }
-  .actions .btn { flex: 1; }
-
-  .result { margin-top: 16px; font-size: 14px; word-break: break-word; }
-  .result.ok  { color: #2F6B4B; }
-  .result.err { color: #A33A2B; }
+  /* ---------- 底栏 ---------- */
+  nav {
+    display: flex;
+    border-top: 1px solid var(--line);
+    background: var(--card);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .tab {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 10px 0 8px;
+    border: 0;
+    background: none;
+    color: var(--soft);
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .tab svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .tab.active { color: var(--accent); font-weight: 600; }
 
   button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 </style>
@@ -217,6 +216,7 @@
 
 <body>
 
+<!-- 脚本出错时，这里会弹出红色提示条 -->
 <div id="status" style="display:none;flex:none;padding:4px 12px;font-size:12px;background:#F3D9D4;color:#7A2B20;text-align:center"></div>
 
 <main>
@@ -233,6 +233,45 @@
     </div>
   </section>
 
+  <!-- ========== 记忆 ========== -->
+  <section class="page" id="page-memory">
+    <header class="page-head">
+      <h1>记忆</h1>
+      <p>总结剧情，帮 AI 记住前面发生的事</p>
+    </header>
+    <div class="page-body">
+      <div class="field">
+        <label for="mem-summary">当前总结</label>
+        <textarea id="mem-summary" rows="9" placeholder="还没有总结。玩一会儿后点「立即总结」，或者等它自动生成。你也可以直接在这里修改。"></textarea>
+        <p class="hint" id="mem-info"></p>
+      </div>
+      <div class="actions">
+        <button class="btn" id="mem-run" type="button">立即总结</button>
+        <button class="btn ghost" id="mem-clear" type="button">清空总结</button>
+      </div>
+      <p class="result" id="mem-result"></p>
+
+      <h2 class="section-title">自动总结</h2>
+      <div class="field">
+        <label for="mem-auto">每隔几轮自动总结</label>
+        <input id="mem-auto" type="number" inputmode="numeric" min="0" step="1">
+        <p class="hint">一轮 = 你发一条 + AI 回一条。填 0 就是关闭自动总结。</p>
+      </div>
+      <div class="field">
+        <label for="mem-keep">保留最近几条原文</label>
+        <input id="mem-keep" type="number" inputmode="numeric" min="0" step="1">
+        <p class="hint">最新的这几条对话不参与总结，继续原样发给 AI，剧情衔接更自然。</p>
+      </div>
+
+      <h2 class="section-title">总结提示词</h2>
+      <div class="field">
+        <textarea id="mem-prompt" rows="9"></textarea>
+        <p class="hint">这段话会发给副 API，告诉它该怎么写总结。</p>
+      </div>
+      <button class="btn ghost" id="mem-reset" type="button">恢复默认提示词</button>
+    </div>
+  </section>
+
   <!-- ========== 面具 ========== -->
   <section class="page" id="page-mask">
     <header class="page-head">
@@ -240,7 +279,7 @@
       <p>存放你扮演的人设</p>
     </header>
     <div class="page-body">
-      <div class="empty"><strong>还没有面具</strong>第 4 步会在这里新建和管理人设。</div>
+      <div class="empty"><strong>还没有面具</strong>下一步会在这里新建和管理人设。</div>
     </div>
   </section>
 
@@ -251,7 +290,7 @@
       <p>导入、导出、编辑酒馆格式预设</p>
     </header>
     <div class="page-body">
-      <div class="empty"><strong>还没有预设</strong>第 5 步会在这里导入酒馆 JSON，并编辑条目。</div>
+      <div class="empty"><strong>还没有预设</strong>之后会在这里导入酒馆 JSON，并编辑条目。</div>
     </div>
   </section>
 
@@ -262,39 +301,15 @@
       <p>连接 API（OpenAI 格式）</p>
     </header>
     <div class="page-body">
-      <div class="field">
-        <label for="cfg-url">API 地址</label>
-        <input id="cfg-url" type="url" inputmode="url" placeholder="https://api.openai.com/v1"
-               autocomplete="off" autocapitalize="off" spellcheck="false">
-        <p class="hint">填到 /v1 为止，末尾不用加 /chat/completions。</p>
-      </div>
+      <h2 class="section-title">主 API</h2>
+      <div id="api-main"></div>
 
-      <div class="field">
-        <label for="cfg-key">API Key</label>
-        <div class="row">
-          <input id="cfg-key" type="password" placeholder="sk-……"
-                 autocomplete="off" autocapitalize="off" spellcheck="false">
-          <button class="btn ghost" id="toggle-key" type="button">显示</button>
-        </div>
-        <p class="hint">只保存在这台手机的浏览器里，只会发给你填的 API 地址。</p>
-      </div>
+      <h2 class="section-title">副 API（用来总结记忆）</h2>
+      <p class="hint" style="margin-top:-6px;margin-bottom:16px">可以选一个便宜的模型。三项都留空的话，总结时会直接用主 API。</p>
+      <div id="api-sub"></div>
 
-      <div class="field">
-        <label for="cfg-model">模型名</label>
-        <div class="row">
-          <input id="cfg-model" placeholder="例如 gpt-4o"
-                 autocomplete="off" autocapitalize="off" spellcheck="false">
-          <button class="btn ghost" id="fetch-models" type="button">获取列表</button>
-        </div>
-        <div class="model-picker" id="model-picker" hidden></div>
-        <p class="hint">点「获取列表」后，下面会出现模型列表，点一下就能选。也可以直接打字来筛选。</p>
-      </div>
-
-      <div class="actions">
-        <button class="btn" id="save" type="button">保存</button>
-        <button class="btn ghost" id="test" type="button">测试连接</button>
-      </div>
-      <p class="result" id="cfg-result"></p>
+      <button class="btn" id="save" type="button" style="width:100%">保存设置</button>
+      <p class="result" id="save-result"></p>
     </div>
   </section>
 </main>
@@ -304,6 +319,10 @@
   <button class="tab" data-page="world">
     <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg>
     世界
+  </button>
+  <button class="tab" data-page="memory">
+    <svg viewBox="0 0 24 24"><path d="M6 4h12v16l-6-4-6 4z"/><path d="M9.5 9h5"/></svg>
+    记忆
   </button>
   <button class="tab" data-page="mask">
     <svg viewBox="0 0 24 24"><path d="M4 5c5 2 11 2 16 0v6c0 5-3.5 8-8 8s-8-3-8-8z"/><path d="M8.5 10.5h2M13.5 10.5h2M9.5 14.5c1.5 1 3.5 1 5 0"/></svg>
@@ -320,47 +339,131 @@
 </nav>
 
 <script>
-  // ---------- 出错时，顶部会弹出红色提示条，方便我们排查 ----------
+  // ============================================================
+  //  0. 出错提示：脚本出错时，顶部会弹出红色提示条，方便排查
+  // ============================================================
   const statusBar = document.getElementById('status');
   window.onerror = function (msg, src, line) {
     statusBar.textContent = '出错了：' + msg + '（第 ' + line + ' 行）';
     statusBar.style.display = 'block';
   };
 
-  // ---------- 切换页面 ----------
-  const tabs  = document.querySelectorAll('.tab');
-  const pages = document.querySelectorAll('.page');
 
-  function showPage(name) {
-    pages.forEach(p => p.classList.toggle('active', p.id === 'page-' + name));
-    tabs.forEach(t => t.classList.toggle('active', t.dataset.page === name));
-    try { localStorage.setItem('lastPage', name); } catch (e) {}   // 记住上次停在哪页
+  // ============================================================
+  //  1. 小工具：读写浏览器存储、调用 API
+  // ============================================================
+  function loadJSON(key, fallback) {
+    try {
+      const v = JSON.parse(localStorage.getItem(key));
+      return (v === null || v === undefined) ? fallback : v;
+    } catch (e) { return fallback; }
+  }
+  function saveJSON(key, value) {
+    try { localStorage.setItem(key, JSON.stringify(value)); return true; }
+    catch (e) { return false; }
   }
 
-  tabs.forEach(t => t.addEventListener('click', () => showPage(t.dataset.page)));
+  // 设置：{ baseUrl, apiKey, model, sub: { baseUrl, apiKey, model } }
+  //   外层是主 API，sub 是副 API
+  const SETTINGS_KEY = 'wenyou.settings';
+  const loadSettings = () => loadJSON(SETTINGS_KEY, {});
+  const saveSettings = s => saveJSON(SETTINGS_KEY, s);
 
-  let last = 'world';
-  try { last = localStorage.getItem('lastPage') || 'world'; } catch (e) {}
-  showPage(last);
+  const isComplete = c => !!(c && c.baseUrl && c.apiKey && c.model);
+  const getMain = () => loadSettings();
+  // 副 API 没填完整时，退回用主 API
+  function getSub() {
+    const s = loadSettings();
+    return isComplete(s.sub) ? s.sub : s;
+  }
+  const usingSubApi = () => isComplete(loadSettings().sub);
+
+  // 从 API 返回的错误里取出人能看懂的文字
+  function errorText(data) {
+    if (!data || !data.error) return '未知错误';
+    return data.error.message || JSON.stringify(data.error);
+  }
+
+  // 发一次对话请求，返回 AI 回复的文字；出错时抛出带中文说明的错误
+  async function chatRequest(cfg, messages) {
+    const ctrl  = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 180000);          // 最多等 3 分钟
+    try {
+      const res = await fetch(cfg.baseUrl + '/chat/completions', {
+        method: 'POST',
+        signal: ctrl.signal,
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.apiKey },
+        body: JSON.stringify({ model: cfg.model, messages: messages })
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error('（' + res.status + '）' + errorText(data));
+      if (data === null) throw new Error('返回的内容看不懂，API 地址可能填错了。');
+      const m = data.choices && data.choices[0] && data.choices[0].message;
+      const reply = m && m.content;
+      if (!reply) throw new Error('模型没有返回内容。');
+      return reply;
+    } catch (e) {
+      if (e.name === 'AbortError') throw new Error('等太久了，已中断。');
+      if (e instanceof TypeError) throw new Error('连不上（' + e.message + '）。请检查地址，以及网络/VPN。');
+      throw e;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
 
   // ============================================================
-  //  第 3 步：世界页真正调用 AI
+  //  2. 数据：聊天记录、记忆
   // ============================================================
   const HISTORY_KEY = 'wenyou.history';
+  const MEMORY_KEY  = 'wenyou.memory';
 
-  // 临时的系统提示词。第 5、6 步做完预设后，会换成你导入的预设。
+  // 临时的系统提示词。之后做完预设，会换成你导入的预设。
   const DEFAULT_SYSTEM = '你是一个文字冒险游戏的叙述者。根据玩家输入的指令，用生动的第二人称描写接下来发生的事，并留出让玩家继续行动的空间。';
 
+  const DEFAULT_SUMMARY_PROMPT =
+    '你是文字冒险游戏的记录员。请把【已有摘要】和【新增对话】合并成一份更新后的完整剧情摘要。\n' +
+    '要求：\n' +
+    '1. 保留人物、地点、关键事件、玩家做出的重要选择、未解决的线索和当前处境。\n' +
+    '2. 删掉无关细节和修辞，不要编造对话里没有的内容。\n' +
+    '3. 用第三人称，简洁的短段落或条目。\n' +
+    '4. 只输出摘要本身，不要加任何说明。';
+
+  // 聊天记录：[{ role: 'user' 或 'assistant', content: '文字' }, ...]
+  let history = loadJSON(HISTORY_KEY, []);
+  const saveHistory = () => saveJSON(HISTORY_KEY, history);
+
+  // 记忆：
+  //   summary   当前总结
+  //   covered   聊天记录里前多少条已经被总结过了
+  //   prompt    总结提示词
+  //   autoEvery 每隔几轮自动总结（0 = 关闭）
+  //   keepRecent 最近几条原文不参与总结
+  let memory = Object.assign(
+    { summary: '', covered: 0, prompt: DEFAULT_SUMMARY_PROMPT, autoEvery: 8, keepRecent: 4 },
+    loadJSON(MEMORY_KEY, {})
+  );
+  const saveMemory = () => saveJSON(MEMORY_KEY, memory);
+
+  let epoch = 0;   // 每次清空记录就加 1，用来丢弃清空之前发出的、迟到的总结结果
+
+  // 组装发给主 AI 的内容：系统提示词 + 总结 + 总结之后的新对话
+  function buildMessages() {
+    let system = DEFAULT_SYSTEM;
+    if (memory.summary.trim()) {
+      system += '\n\n【此前的剧情摘要】\n' + memory.summary.trim();
+    }
+    const covered = Math.min(memory.covered, history.length);
+    return [{ role: 'system', content: system }].concat(history.slice(covered));
+  }
+
+
+  // ============================================================
+  //  3. 世界页
+  // ============================================================
   const log     = document.getElementById('log');
   const input   = document.getElementById('input');
   const sendBtn = document.getElementById('send');
-
-  // 聊天记录：[{ role: 'user' 或 'assistant', content: '文字' }, ...]
-  let history = [];
-  try { history = JSON.parse(localStorage.getItem(HISTORY_KEY)) || []; } catch (e) {}
-  function saveHistory() {
-    try { localStorage.setItem(HISTORY_KEY, JSON.stringify(history)); } catch (e) {}
-  }
 
   // 往屏幕上加一个气泡。cls 是 'user'（你）、'sys'（AI）或 'err'（错误）
   function addMsg(text, cls) {
@@ -380,7 +483,6 @@
     }
     history.forEach(m => addMsg(m.content, m.role === 'user' ? 'user' : 'sys'));
   }
-  renderHistory();
 
   // 输入框随内容变高（最高 120px）
   function autoGrow() {
@@ -389,7 +491,6 @@
   }
   input.addEventListener('input', autoGrow);
 
-  // 发送指令
   let busy = false;                  // 正在等 AI 回复时，不允许重复发送
   async function send() {
     if (busy) return;
@@ -398,8 +499,8 @@
 
     log.querySelectorAll('.msg.err').forEach(e => e.remove());   // 清掉上一次的错误提示
 
-    const s = loadSettings();
-    if (!s.baseUrl || !s.apiKey || !s.model) {
+    const cfg = getMain();
+    if (!isComplete(cfg)) {
       addMsg('还没有连接 API。请先到「设置」页填好地址、Key 和模型名。', 'err');
       return;
     }
@@ -414,180 +515,347 @@
     autoGrow();
     const pending = addMsg('……', 'sys');                         // AI 回复前先占个位
 
-    const ctrl  = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 180000);        // 最多等 3 分钟
-
+    let ok = false;
     try {
-      const res = await fetch(s.baseUrl + '/chat/completions', {
-        method: 'POST',
-        signal: ctrl.signal,
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + s.apiKey },
-        body: JSON.stringify({
-          model: s.model,
-          messages: [{ role: 'system', content: DEFAULT_SYSTEM }, ...history]
-        })
-      });
-      const data = await res.json().catch(() => null);
-      if (!res.ok) throw new Error('（' + res.status + '）' + errorText(data));
-
-      const reply = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
-      if (!reply) throw new Error('模型没有返回内容');
-
+      const reply = await chatRequest(cfg, buildMessages());
       history.push({ role: 'assistant', content: reply });
       saveHistory();
       pending.textContent = reply;
+      ok = true;
     } catch (e) {
       history.pop();                 // 失败了：撤回刚才那条指令，文字放回输入框方便重发
       userDiv.remove();
       input.value = text;
       autoGrow();
       pending.className = 'msg err';
-      pending.textContent = '出错了：' + (e.name === 'AbortError' ? '等太久了，已中断。' : e.message);
+      pending.textContent = '出错了：' + e.message;
     } finally {
-      clearTimeout(timer);
       busy = false;
       sendBtn.disabled = false;
       log.scrollTop = log.scrollHeight;
     }
-  }
 
+    if (ok) maybeAutoSummarize();
+  }
   sendBtn.addEventListener('click', send);
 
-  // 清空记录，重新开始
+  // 清空：记录和总结一起清掉，重新开始
   document.getElementById('clear').addEventListener('click', function () {
-    if (history.length === 0) return;
-    if (confirm('清空当前的游戏记录，重新开始？')) {
-      history = [];
-      saveHistory();
-      renderHistory();
-    }
+    if (history.length === 0 && !memory.summary) return;
+    if (!confirm('清空游戏记录和记忆总结，重新开始？')) return;
+    history = [];
+    saveHistory();
+    memory.summary = '';
+    memory.covered = 0;
+    epoch++;
+    saveMemory();
+    renderHistory();
+    refreshMemoryUI();
   });
 
 
   // ============================================================
-  //  第 2 步：设置页（API 地址 / Key / 模型名）
+  //  4. 设置页：主 API 和副 API 共用同一套表单
   // ============================================================
-  const SETTINGS_KEY = 'wenyou.settings';      // 存在浏览器里的名字
+  // p 是名字前缀（'main' 或 'sub'），containerId 是放表单的位置，initial 是之前存的内容
+  function setupApiBlock(p, containerId, initial) {
+    const root = document.getElementById(containerId);
+    root.innerHTML =
+      '<div class="field">' +
+        '<label for="' + p + '-url">API 地址</label>' +
+        '<input id="' + p + '-url" type="url" inputmode="url" placeholder="https://api.openai.com/v1" autocomplete="off" autocapitalize="off" spellcheck="false">' +
+        '<p class="hint">填到 /v1 为止，末尾不用加 /chat/completions。</p>' +
+      '</div>' +
+      '<div class="field">' +
+        '<label for="' + p + '-key">API Key</label>' +
+        '<div class="row">' +
+          '<input id="' + p + '-key" type="password" placeholder="sk-……" autocomplete="off" autocapitalize="off" spellcheck="false">' +
+          '<button class="btn ghost" id="' + p + '-toggle" type="button">显示</button>' +
+        '</div>' +
+        '<p class="hint">只保存在这台手机的浏览器里，只会发给你填的 API 地址。</p>' +
+      '</div>' +
+      '<div class="field">' +
+        '<label for="' + p + '-model">模型名</label>' +
+        '<div class="row">' +
+          '<input id="' + p + '-model" placeholder="例如 gpt-4o" autocomplete="off" autocapitalize="off" spellcheck="false">' +
+          '<button class="btn ghost" id="' + p + '-fetch" type="button">获取列表</button>' +
+        '</div>' +
+        '<div class="model-picker" id="' + p + '-picker" hidden></div>' +
+        '<p class="hint">点「获取列表」后，下面会出现模型列表，点一下就能选。也可以直接打字来筛选。</p>' +
+      '</div>' +
+      '<button class="btn ghost" id="' + p + '-test" type="button" style="width:100%">测试连接</button>' +
+      '<p class="result" id="' + p + '-result"></p>';
 
-  function loadSettings() {
-    try { return JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}; }
-    catch (e) { return {}; }
-  }
-  function saveSettings(s) {
-    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); return true; }
-    catch (e) { return false; }
-  }
+    const $ = id => document.getElementById(p + '-' + id);
+    const url = $('url'), key = $('key'), model = $('model'), picker = $('picker'), result = $('result');
 
-  const cfgUrl    = document.getElementById('cfg-url');
-  const cfgKey    = document.getElementById('cfg-key');
-  const cfgModel  = document.getElementById('cfg-model');
-  const cfgResult = document.getElementById('cfg-result');
-  const modelPicker = document.getElementById('model-picker');
+    url.value   = initial.baseUrl || '';
+    key.value   = initial.apiKey  || '';
+    model.value = initial.model   || '';
 
-  // 打开页面时，把之前存的内容填回输入框
-  const saved = loadSettings();
-  cfgUrl.value   = saved.baseUrl || '';
-  cfgKey.value   = saved.apiKey  || '';
-  cfgModel.value = saved.model   || '';
+    // 读取输入框当前内容（地址末尾多余的 / 会去掉）
+    function read() {
+      return {
+        baseUrl: url.value.trim().replace(/\/+$/, ''),
+        apiKey:  key.value.trim(),
+        model:   model.value.trim()
+      };
+    }
+    function show(text, ok) {
+      result.textContent = text;
+      result.className = 'result ' + (ok ? 'ok' : 'err');
+    }
 
-  // 读取输入框当前内容（地址末尾多余的 / 会去掉）
-  function readForm() {
-    return {
-      baseUrl: cfgUrl.value.trim().replace(/\/+$/, ''),
-      apiKey:  cfgKey.value.trim(),
-      model:   cfgModel.value.trim()
-    };
-  }
+    // ----- 模型列表：点一下就能选 -----
+    const modelsKey = p === 'main' ? 'wenyou.models' : 'wenyou.models.sub';
+    let ids = loadJSON(modelsKey, []);
 
-  function showResult(text, ok) {
-    cfgResult.textContent = text;
-    cfgResult.className = 'result ' + (ok ? 'ok' : 'err');
-  }
-
-  // ---------- 模型列表：点一下就能选 ----------
-  const MODELS_KEY = 'wenyou.models';
-  let modelIds = [];
-  try { modelIds = JSON.parse(localStorage.getItem(MODELS_KEY)) || []; } catch (e) {}
-
-  function renderModels() {
-    const typed = cfgModel.value.trim().toLowerCase();
-    const exact = modelIds.some(id => id.toLowerCase() === typed);
-    // 输入框里有字、又不是完整的模型名时，按输入内容筛选
-    const shown = (typed && !exact) ? modelIds.filter(id => id.toLowerCase().includes(typed)) : modelIds;
-    modelPicker.innerHTML = '';
-    shown.forEach(id => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'model-item' + (id.toLowerCase() === typed ? ' current' : '');
-      b.textContent = id;
-      b.addEventListener('click', () => {
-        cfgModel.value = id;
-        cfgModel.blur();
-        modelPicker.hidden = true;
+    function renderModels() {
+      const typed = model.value.trim().toLowerCase();
+      const exact = ids.some(id => id.toLowerCase() === typed);
+      const shown = (typed && !exact) ? ids.filter(id => id.toLowerCase().includes(typed)) : ids;
+      picker.innerHTML = '';
+      shown.forEach(id => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'model-item' + (id.toLowerCase() === typed ? ' current' : '');
+        b.textContent = id;
+        b.addEventListener('click', () => {
+          model.value = id;
+          model.blur();
+          picker.hidden = true;
+        });
+        picker.appendChild(b);
       });
-      modelPicker.appendChild(b);
+      picker.hidden = shown.length === 0;
+    }
+    model.addEventListener('focus', renderModels);
+    model.addEventListener('input', renderModels);
+
+    $('toggle').addEventListener('click', function () {
+      const hidden = key.type === 'password';
+      key.type = hidden ? 'text' : 'password';
+      this.textContent = hidden ? '隐藏' : '显示';
     });
-    modelPicker.hidden = shown.length === 0;
+
+    $('fetch').addEventListener('click', async function () {
+      const c = read();
+      if (!c.baseUrl || !c.apiKey) { show('请先填好 API 地址和 Key。', false); return; }
+      show('获取中……', true);
+      try {
+        const res  = await fetch(c.baseUrl + '/models', { headers: { 'Authorization': 'Bearer ' + c.apiKey } });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) { show('获取失败（' + res.status + '）：' + errorText(data), false); return; }
+        ids = ((data && data.data) || []).map(m => m.id).filter(Boolean);
+        saveJSON(modelsKey, ids);
+        renderModels();
+        show('获取到 ' + ids.length + ' 个模型，点下面的列表选择。', ids.length > 0);
+      } catch (e) {
+        show('连不上：' + e.message + '。请检查地址，以及网络/VPN。', false);
+      }
+    });
+
+    $('test').addEventListener('click', async function () {
+      const c = read();
+      if (p === 'sub' && !c.baseUrl && !c.apiKey && !c.model) {
+        show('副 API 没填，总结时会使用主 API。', true);
+        return;
+      }
+      if (!isComplete(c)) { show('请先把地址、Key、模型名都填上。', false); return; }
+      show('测试中……', true);
+      try {
+        const reply = await chatRequest(c, [{ role: 'user', content: '你好' }]);
+        show('连接成功。模型回复：' + reply, true);
+      } catch (e) {
+        show('连接失败：' + e.message, false);
+      }
+    });
+
+    return { read: read };
   }
-  cfgModel.addEventListener('focus', renderModels);
-  cfgModel.addEventListener('input', renderModels);
 
-  // 显示 / 隐藏 Key
-  document.getElementById('toggle-key').addEventListener('click', function () {
-    const hidden = cfgKey.type === 'password';
-    cfgKey.type = hidden ? 'text' : 'password';
-    this.textContent = hidden ? '隐藏' : '显示';
-  });
+  const savedSettings = loadSettings();
+  const mainBlock = setupApiBlock('main', 'api-main', savedSettings);
+  const subBlock  = setupApiBlock('sub',  'api-sub',  savedSettings.sub || {});
 
-  // 保存
   document.getElementById('save').addEventListener('click', function () {
-    const ok = saveSettings(readForm());
-    showResult(ok ? '已保存。' : '保存失败，浏览器不允许存储。', ok);
+    const s = mainBlock.read();
+    s.sub = subBlock.read();
+    const ok = saveSettings(s);
+    const r = document.getElementById('save-result');
+    r.textContent = ok ? '已保存。' : '保存失败，浏览器不允许存储。';
+    r.className = 'result ' + (ok ? 'ok' : 'err');
+    refreshMemoryUI();
   });
 
-  // 获取模型列表
-  document.getElementById('fetch-models').addEventListener('click', async function () {
-    const s = readForm();
-    if (!s.baseUrl || !s.apiKey) { showResult('请先填好 API 地址和 Key。', false); return; }
-    showResult('获取中……', true);
-    try {
-      const res  = await fetch(s.baseUrl + '/models', { headers: { 'Authorization': 'Bearer ' + s.apiKey } });
-      const data = await res.json().catch(() => null);
-      if (!res.ok) { showResult('获取失败（' + res.status + '）：' + errorText(data), false); return; }
-      const ids = ((data && data.data) || []).map(m => m.id).filter(Boolean);
-      modelIds = ids;
-      try { localStorage.setItem(MODELS_KEY, JSON.stringify(ids)); } catch (e) {}
-      renderModels();
-      showResult('获取到 ' + ids.length + ' 个模型，点下面的列表选择。', ids.length > 0);
-    } catch (e) {
-      showResult('连不上：' + e.message + '。请检查地址，以及网络/VPN。', false);
-    }
-  });
 
-  // 测试连接：发一句「你好」，看模型有没有回
-  document.getElementById('test').addEventListener('click', async function () {
-    const s = readForm();
-    if (!s.baseUrl || !s.apiKey || !s.model) { showResult('请先把地址、Key、模型名都填上。', false); return; }
-    showResult('测试中……', true);
-    try {
-      const res = await fetch(s.baseUrl + '/chat/completions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + s.apiKey },
-        body: JSON.stringify({ model: s.model, messages: [{ role: 'user', content: '你好' }] })
-      });
-      const data = await res.json().catch(() => null);
-      if (!res.ok) { showResult('连接失败（' + res.status + '）：' + errorText(data), false); return; }
-      const reply = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
-      showResult('连接成功。模型回复：' + (reply || '（空）'), true);
-    } catch (e) {
-      showResult('连不上：' + e.message + '。请检查地址，以及网络/VPN。', false);
-    }
-  });
+  // ============================================================
+  //  5. 记忆页
+  // ============================================================
+  const memSummary = document.getElementById('mem-summary');
+  const memPrompt  = document.getElementById('mem-prompt');
+  const memAuto    = document.getElementById('mem-auto');
+  const memKeep    = document.getElementById('mem-keep');
+  const memInfo    = document.getElementById('mem-info');
+  const memRun     = document.getElementById('mem-run');
+  const memResult  = document.getElementById('mem-result');
 
-  // 从 API 返回的错误里取出人能看懂的文字
-  function errorText(data) {
-    return (data && data.error && (data.error.message || data.error)) || '未知错误';
+  function memShow(text, ok) {
+    memResult.textContent = text;
+    memResult.className = 'result ' + (ok ? 'ok' : 'err');
   }
+
+  // 把存的内容显示到页面上
+  function refreshMemoryUI() {
+    memSummary.value = memory.summary;
+    memPrompt.value  = memory.prompt;
+    memAuto.value    = memory.autoEvery;
+    memKeep.value    = memory.keepRecent;
+
+    const covered = Math.min(memory.covered, history.length);
+    const rest = history.length - covered;
+    memInfo.textContent =
+      '已总结前 ' + covered + ' 条对话；之后的 ' + rest + ' 条原文会原样发给 AI。总结使用：' +
+      (usingSubApi() ? '副 API' : '主 API') + '。';
+  }
+
+  // 读取非负整数，填错了就用默认值
+  function readInt(el, fallback) {
+    const n = parseInt(el.value, 10);
+    return (isNaN(n) || n < 0) ? fallback : n;
+  }
+
+  // 改了就自动保存
+  memSummary.addEventListener('change', function () {
+    memory.summary = memSummary.value;
+    saveMemory();
+    refreshMemoryUI();
+    memShow('已保存。', true);
+  });
+  memPrompt.addEventListener('change', function () {
+    memory.prompt = memPrompt.value.trim() || DEFAULT_SUMMARY_PROMPT;
+    saveMemory();
+    refreshMemoryUI();
+    memShow('已保存。', true);
+  });
+  memAuto.addEventListener('change', function () {
+    memory.autoEvery = readInt(memAuto, 8);
+    saveMemory();
+    refreshMemoryUI();
+    memShow('已保存。', true);
+  });
+  memKeep.addEventListener('change', function () {
+    memory.keepRecent = readInt(memKeep, 4);
+    saveMemory();
+    refreshMemoryUI();
+    memShow('已保存。', true);
+  });
+
+  document.getElementById('mem-reset').addEventListener('click', function () {
+    memory.prompt = DEFAULT_SUMMARY_PROMPT;
+    saveMemory();
+    refreshMemoryUI();
+    memShow('已恢复默认提示词。', true);
+  });
+
+  document.getElementById('mem-clear').addEventListener('click', function () {
+    if (!memory.summary && memory.covered === 0) return;
+    if (!confirm('清空总结？之后所有对话原文都会重新发给 AI。')) return;
+    memory.summary = '';
+    memory.covered = 0;
+    epoch++;
+    saveMemory();
+    refreshMemoryUI();
+    memShow('已清空总结。', true);
+  });
+
+  // ---------- 生成总结 ----------
+  // auto 为 true 表示是自动触发的
+  let summarizing = false;
+  async function summarize(auto) {
+    if (summarizing) return;
+    if (busy) {
+      if (!auto) memShow('AI 正在回复，等它写完再总结。', false);
+      return;
+    }
+
+    const start = Math.min(memory.covered, history.length);
+    const end   = history.length - memory.keepRecent;     // 总结到这一条之前
+    if (end <= start) {
+      if (!auto) memShow('现在没有需要总结的新对话。', false);
+      return;
+    }
+
+    const cfg = getSub();
+    if (!isComplete(cfg)) {
+      memShow('还没有可用的 API。请先到「设置」页填写。', false);
+      return;
+    }
+
+    summarizing = true;
+    memRun.disabled = true;
+    memShow(auto ? '正在自动总结……' : '总结中……', true);
+    const myEpoch = epoch;
+
+    // 把要总结的对话拼成一段文字
+    const chunk = history.slice(start, end)
+      .map(m => (m.role === 'user' ? '玩家：' : '叙述者：') + m.content)
+      .join('\n\n');
+    const userText =
+      '【已有摘要】\n' + (memory.summary.trim() || '（暂无）') +
+      '\n\n【新增对话】\n' + chunk +
+      '\n\n请输出更新后的完整剧情摘要。';
+
+    try {
+      const reply = await chatRequest(cfg, [
+        { role: 'system', content: memory.prompt || DEFAULT_SUMMARY_PROMPT },
+        { role: 'user',   content: userText }
+      ]);
+      if (myEpoch !== epoch) return;          // 期间清空过记录，这份总结作废
+      memory.summary = reply.trim();
+      memory.covered = end;
+      saveMemory();
+      refreshMemoryUI();
+      memShow((auto ? '已自动总结' : '总结完成') + '，已总结到第 ' + end + ' 条。', true);
+    } catch (e) {
+      memShow('总结失败：' + e.message + (auto ? '（下次回复后会再试）' : ''), false);
+    } finally {
+      summarizing = false;
+      memRun.disabled = false;
+    }
+  }
+
+  memRun.addEventListener('click', () => summarize(false));
+
+  // 每次 AI 回复后检查：攒够几轮了就自动总结
+  function maybeAutoSummarize() {
+    if (memory.autoEvery <= 0) return;
+    const covered = Math.min(memory.covered, history.length);
+    const pendingCount = history.length - covered - memory.keepRecent;
+    if (pendingCount >= memory.autoEvery * 2) summarize(true);
+  }
+
+
+  // ============================================================
+  //  6. 底栏切换页面（放在最后，等上面都准备好再启动）
+  // ============================================================
+  const tabs  = document.querySelectorAll('.tab');
+  const pages = document.querySelectorAll('.page');
+
+  function showPage(name) {
+    pages.forEach(p => p.classList.toggle('active', p.id === 'page-' + name));
+    tabs.forEach(t => t.classList.toggle('active', t.dataset.page === name));
+    if (name === 'memory') refreshMemoryUI();       // 进记忆页时刷新一下数字
+    try { localStorage.setItem('lastPage', name); } catch (e) {}
+  }
+  tabs.forEach(t => t.addEventListener('click', () => showPage(t.dataset.page)));
+
+  renderHistory();
+  refreshMemoryUI();
+  let lastPage = 'world';
+  try { lastPage = localStorage.getItem('lastPage') || 'world'; } catch (e) {}
+  if (!document.getElementById('page-' + lastPage)) lastPage = 'world';
+  showPage(lastPage);
 </script>
 
 </body>
