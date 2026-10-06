@@ -64,6 +64,9 @@
   }
   .page-head p { font-size: 14px; color: var(--soft); }
 
+  .head-row { display: flex; justify-content: space-between; align-items: center; }
+  .btn.small { padding: 6px 14px; font-size: 14px; }
+
   .page-body { flex: 1; overflow-y: auto; padding: 20px; }
 
   /* 空页面时的提示 */
@@ -95,6 +98,7 @@
   }
   .msg.user { margin-left: auto; background: var(--accent); color: #fff; border-bottom-right-radius: 4px; }
   .msg.sys  { margin-right: auto; background: var(--card); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
+  .msg.err  { margin-right: auto; background: #F6E4E0; border: 1px solid #E3BFB8; color: #8C2F22; border-bottom-left-radius: 4px; }
 
   .composer {
     display: flex;
@@ -175,6 +179,7 @@
     cursor: pointer;
   }
   .btn.ghost { background: transparent; color: var(--accent); }
+  button:disabled { opacity: 0.5; cursor: default; }
   .model-picker {
     margin-top: 8px;
     max-height: 240px;
@@ -217,12 +222,11 @@
 <main>
   <!-- ========== 世界 ========== -->
   <section class="page active" id="page-world">
-    <header class="page-head">
+    <header class="page-head head-row">
       <h1>世界</h1>
+      <button class="btn ghost small" id="clear" type="button">清空</button>
     </header>
-    <div class="log" id="log">
-      <div class="msg sys">欢迎来到这里。输入一条指令，试试看。（现在还没接 API，所以只会回显你的话。）</div>
-    </div>
+    <div class="log" id="log"></div>
     <div class="composer">
       <textarea id="input" rows="1" placeholder="输入指令……"></textarea>
       <button id="send">发送</button>
@@ -339,27 +343,125 @@
   try { last = localStorage.getItem('lastPage') || 'world'; } catch (e) {}
   showPage(last);
 
-  // ---------- 世界页：先做个回显，确认输入框能用 ----------
-  const log   = document.getElementById('log');
-  const input = document.getElementById('input');
+  // ============================================================
+  //  第 3 步：世界页真正调用 AI
+  // ============================================================
+  const HISTORY_KEY = 'wenyou.history';
 
-  function addMsg(text, who) {
+  // 临时的系统提示词。第 5、6 步做完预设后，会换成你导入的预设。
+  const DEFAULT_SYSTEM = '你是一个文字冒险游戏的叙述者。根据玩家输入的指令，用生动的第二人称描写接下来发生的事，并留出让玩家继续行动的空间。';
+
+  const log     = document.getElementById('log');
+  const input   = document.getElementById('input');
+  const sendBtn = document.getElementById('send');
+
+  // 聊天记录：[{ role: 'user' 或 'assistant', content: '文字' }, ...]
+  let history = [];
+  try { history = JSON.parse(localStorage.getItem(HISTORY_KEY)) || []; } catch (e) {}
+  function saveHistory() {
+    try { localStorage.setItem(HISTORY_KEY, JSON.stringify(history)); } catch (e) {}
+  }
+
+  // 往屏幕上加一个气泡。cls 是 'user'（你）、'sys'（AI）或 'err'（错误）
+  function addMsg(text, cls) {
     const div = document.createElement('div');
-    div.className = 'msg ' + who;
+    div.className = 'msg ' + cls;
     div.textContent = text;          // 用 textContent，防止内容被当成网页代码执行
     log.appendChild(div);
     log.scrollTop = log.scrollHeight;
+    return div;
   }
 
-  function send() {
+  // 把所有记录重新画一遍（打开页面、清空时用）
+  function renderHistory() {
+    log.innerHTML = '';
+    if (history.length === 0) {
+      addMsg('欢迎来到这里。先到「设置」页填好 API，然后输入一条指令开始。', 'sys');
+    }
+    history.forEach(m => addMsg(m.content, m.role === 'user' ? 'user' : 'sys'));
+  }
+  renderHistory();
+
+  // 输入框随内容变高（最高 120px）
+  function autoGrow() {
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+  }
+  input.addEventListener('input', autoGrow);
+
+  // 发送指令
+  let busy = false;                  // 正在等 AI 回复时，不允许重复发送
+  async function send() {
+    if (busy) return;
     const text = input.value.trim();
     if (!text) return;
-    addMsg(text, 'user');
-    addMsg('（收到：' + text + '）', 'sys');
+
+    log.querySelectorAll('.msg.err').forEach(e => e.remove());   // 清掉上一次的错误提示
+
+    const s = loadSettings();
+    if (!s.baseUrl || !s.apiKey || !s.model) {
+      addMsg('还没有连接 API。请先到「设置」页填好地址、Key 和模型名。', 'err');
+      return;
+    }
+
+    busy = true;
+    sendBtn.disabled = true;
+    if (history.length === 0) log.innerHTML = '';                // 去掉欢迎语
+
+    history.push({ role: 'user', content: text });
+    const userDiv = addMsg(text, 'user');
     input.value = '';
+    autoGrow();
+    const pending = addMsg('……', 'sys');                         // AI 回复前先占个位
+
+    const ctrl  = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 180000);        // 最多等 3 分钟
+
+    try {
+      const res = await fetch(s.baseUrl + '/chat/completions', {
+        method: 'POST',
+        signal: ctrl.signal,
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + s.apiKey },
+        body: JSON.stringify({
+          model: s.model,
+          messages: [{ role: 'system', content: DEFAULT_SYSTEM }, ...history]
+        })
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error('（' + res.status + '）' + errorText(data));
+
+      const reply = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+      if (!reply) throw new Error('模型没有返回内容');
+
+      history.push({ role: 'assistant', content: reply });
+      saveHistory();
+      pending.textContent = reply;
+    } catch (e) {
+      history.pop();                 // 失败了：撤回刚才那条指令，文字放回输入框方便重发
+      userDiv.remove();
+      input.value = text;
+      autoGrow();
+      pending.className = 'msg err';
+      pending.textContent = '出错了：' + (e.name === 'AbortError' ? '等太久了，已中断。' : e.message);
+    } finally {
+      clearTimeout(timer);
+      busy = false;
+      sendBtn.disabled = false;
+      log.scrollTop = log.scrollHeight;
+    }
   }
 
-  document.getElementById('send').addEventListener('click', send);
+  sendBtn.addEventListener('click', send);
+
+  // 清空记录，重新开始
+  document.getElementById('clear').addEventListener('click', function () {
+    if (history.length === 0) return;
+    if (confirm('清空当前的游戏记录，重新开始？')) {
+      history = [];
+      saveHistory();
+      renderHistory();
+    }
+  });
 
 
   // ============================================================
